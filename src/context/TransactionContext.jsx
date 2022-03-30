@@ -2,6 +2,7 @@ import React, {useEffect, useState} from "react";
 import {ethers} from 'ethers';
 
 import { contractABI, contractAddress } from "../utils/constant";
+import { parse } from "@ethersproject/transactions";
 
 export const TransactionContext = React.createContext();
 
@@ -12,21 +13,25 @@ const getEthereumContract = ()=>{
   const signer = provider.getSigner();
   const transactionContract = new ethers.Contract(contractAddress, contractABI, signer);
 
-  console.log({
-    provider,
-    signer,
-    transactionContract
-  });
+  return transactionContract;
 }
 
 export const TransactionProvider = ({children}) => {
   const [currentAccount, setCurrentAccount] = useState('');
+  const [formData, setFormData] = useState({addressTo:'', amount:'', keyword:'', message:''});
+  const [isLoading, setIsLoading] = useState(false);
+  const [transactionCount, setTransactionCount] = useState(localStorage.getItem('transactionCount'));
+
+  const handleChange = (e, name) => {
+    setFormData((prevState) => ({...prevState, [name]: e.target.value}));
+  }
   
   const checkifwalletisConnected = async ()=> {
     try {
       if(!ethereum) return alert("Please install Metamask");
   
       const accounts = await ethereum.request({method: 'eth_accounts'});
+
   
       if(accounts.length) {
         setCurrentAccount(accounts[0]);
@@ -34,6 +39,7 @@ export const TransactionProvider = ({children}) => {
         // getAllTransactions();
       } else {
         console.log('No Account Found');
+
       }
   
       console.log(accounts);
@@ -43,13 +49,15 @@ export const TransactionProvider = ({children}) => {
     }
   }
 
-  const connectWallet = async ()=>{
+  const connectWallet = async () => {
     try {
       if(!ethereum) return alert("Please install Metamask");
 
-    const accounts = await ethereum.request({method: 'eth_requestAccounts'});
+    const accounts = await ethereum.request({ method: "eth_requestAccounts", });
 
     setCurrentAccount(accounts[0]);
+    window.location.reload();
+    
     } catch (error) {
       console.log(error);
 
@@ -62,7 +70,31 @@ export const TransactionProvider = ({children}) => {
       if(!ethereum) return alert("Please install Metamask");
 
       // get data from form
-      
+      const {addressTo, amount, keyword, message} = formData;
+      const transactionContract = getEthereumContract();
+      const parsedAmount = ethers.utils.parseEther(amount);
+
+      await ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: currentAccount,
+          to: addressTo,
+          gas: '0x5208', //21000 gwei
+          value: parsedAmount._hex,         
+        }]
+      });
+
+      const transactionHash = await transactionContract.addToBlockchain(addressTo, parsedAmount, message, keyword);
+
+      setIsLoading(true);
+      console.log(`Loading - ${transactionHash.hash}`);
+      setIsLoading(false);
+      console.log(`Success - ${transactionHash.hash}`);
+
+      const transactionCount = await transactionContract.getTransactionCount();
+
+      setTransactionCount(transactionCount.toNumber());
+
     } catch (error) {
       console.log(error);
 
@@ -75,7 +107,7 @@ export const TransactionProvider = ({children}) => {
   }, []);
 
   return(
-    <TransactionContext.Provider value={{value: connectWallet, currentAccount }}>
+    <TransactionContext.Provider value={{value: connectWallet, currentAccount, formData, setFormData, handleChange, sendTransaction }}>
       {children}
     </TransactionContext.Provider>
   )
