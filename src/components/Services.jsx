@@ -22,6 +22,7 @@ const Services = () => {
           <h1 className="text-white text-3xl sm:text-5xl py-2 text-gradient">Services that we <br/> Continue to growing up</h1>
         </div>
       </div>
+      
       <div className="flex-1 flex-4 justify-start items-center">
         <ServiceCard 
           color="bg-[#2952E3]"
